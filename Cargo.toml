@@ -4,3 +4,5 @@ version = "0.1.0"
 authors = ["Ujjwal Sharma <usharma1998@gmail.com>"]
 
 [dependencies]
+reqwest = "0.8.5"
+serde_json = "1.0"
