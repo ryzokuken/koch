@@ -5,15 +5,18 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::io::ErrorKind;
-// use serde_json::Value;
+use serde_json::Value;
 
-// fn get_text(website: &str) {
-//     let text = reqwest::get(website).unwrap().text().unwrap();
-//     let v: Value = serde_json::from_str(&text).unwrap();
-//     for k in v["tree"].as_array().unwrap() {
-//         println!("{}", k["path"]);
-//     }
-// }
+fn get_recipes() -> Vec<String> {
+    let mut recipes = Vec::new();
+    let website = "https://api.github.com/repos/Homebrew/homebrew-core/git/trees/ae7c06e4b7c363a68df4ed010f8afbb02a8abf24";
+    let text = reqwest::get(website).unwrap().text().unwrap();
+    let v: Value = serde_json::from_str(&text).unwrap();
+    for k in v["tree"].as_array().unwrap() {
+        recipes.push(k["path"].to_string());
+    }
+    return recipes;
+}
 
 fn load_recipe_cache() -> Vec<String> {
     let mut path = env::home_dir().unwrap();
@@ -39,13 +42,18 @@ fn load_recipe_cache() -> Vec<String> {
 }
 
 fn main() {
-    // let args: Vec<String> = env::args().collect();
-    // match args[1].as_str() {
-    //     "install" => get_text("https://api.github.com/repos/Homebrew/homebrew-core/git/trees/ae7c06e4b7c363a68df4ed010f8afbb02a8abf24"),
-    //     _ => panic!("FAIL!"),
-    // }
+    let mut recipes = load_recipe_cache();
+    for recipe in recipes {
+        println!("{}", recipe);
+    }
 
-    let recipes = load_recipe_cache();
+    let args: Vec<String> = env::args().collect();
+    match args[1].as_str() {
+        "update" => recipes = get_recipes(),
+        // "install" => get_text(),
+        _ => panic!("FAIL!"),
+    }
+
     for recipe in recipes {
         println!("{}", recipe);
     }
