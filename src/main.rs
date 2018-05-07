@@ -11,8 +11,8 @@ use std::io::prelude::*;
 
 fn get_recipes() -> Vec<String> {
     let mut recipes = Vec::new();
-    let website = "https://api.github.com/repos/Homebrew/homebrew-core/git/trees/ae7c06e4b7c363a68df4ed010f8afbb02a8abf24";
-    let text = reqwest::get(website).unwrap().text().unwrap();
+    let url = "https://api.github.com/repos/Homebrew/homebrew-core/git/trees/ae7c06e4b7c363a68df4ed010f8afbb02a8abf24";
+    let text = reqwest::get(url).unwrap().text().unwrap();
     let v: Value = serde_json::from_str(&text).unwrap();
 
     let patterns: &[_] = &['.', 'r', 'b'];
@@ -44,6 +44,16 @@ fn update(args: Vec<String>, path: PathBuf) {
     println!("[+] Recipes written successfully to local disk");
 }
 
+fn fetch_instructions(program: &str) {
+    let url = format!(
+        "https://api.github.com/repos/Homebrew/homebrew-core/contents/Formula/{}.rb",
+        program
+    );
+    let text = reqwest::get(url.as_str()).unwrap().text().unwrap();
+    let v: Value = serde_json::from_str(&text).unwrap();
+    println!("{}", v["content"].as_str().unwrap())
+}
+
 fn install(args: Vec<String>, recipes: &Vec<String>) {
     if args.len() != 3 {
         panic!("Update expects a single argument.");
@@ -59,7 +69,8 @@ fn install(args: Vec<String>, recipes: &Vec<String>) {
     println!(
         "[+] Recipe {} found successfully, fetching instructions",
         args[2]
-    )
+    );
+    fetch_instructions(args[2].as_str());
 }
 
 fn load_recipe_cache(path: &PathBuf) -> Vec<String> {
