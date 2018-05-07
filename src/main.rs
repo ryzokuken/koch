@@ -7,6 +7,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::io::ErrorKind;
 use serde_json::Value;
+use std::io::prelude::*;
 
 fn get_recipes() -> Vec<String> {
     let mut recipes = Vec::new();
@@ -14,10 +15,16 @@ fn get_recipes() -> Vec<String> {
     let text = reqwest::get(website).unwrap().text().unwrap();
     let v: Value = serde_json::from_str(&text).unwrap();
 
-    let patterns : &[_] = &['.', 'r', 'b'];
+    let patterns: &[_] = &['.', 'r', 'b'];
 
     for k in v["tree"].as_array().unwrap() {
-        recipes.push(k["path"].as_str().unwrap().trim_matches(patterns).to_string());
+        recipes.push(
+            k["path"]
+                .as_str()
+                .unwrap()
+                .trim_matches(patterns)
+                .to_string(),
+        );
     }
     return recipes;
 }
@@ -28,10 +35,11 @@ fn update(args: Vec<String>, path: PathBuf) -> Vec<String> {
     }
 
     let recipes = get_recipes();
-    // let text = recipes.join("\n");
+    let text = recipes.join("\n");
 
-    // let f = File::open(&path).unwrap();
-    // f.write_all(text.as_bytes());
+    println!("{:?}", path);
+    let mut f = File::create(&path).unwrap();
+    f.write_all(text.as_bytes()).unwrap();
 
     return recipes;
 }
