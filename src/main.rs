@@ -1,3 +1,4 @@
+extern crate base64;
 extern crate reqwest;
 extern crate serde_json;
 
@@ -44,14 +45,17 @@ fn update(args: Vec<String>, path: PathBuf) {
     println!("[+] Recipes written successfully to local disk");
 }
 
-fn fetch_instructions(program: &str) {
+fn fetch_instructions(program: &str) -> String {
     let url = format!(
         "https://api.github.com/repos/Homebrew/homebrew-core/contents/Formula/{}.rb",
         program
     );
     let text = reqwest::get(url.as_str()).unwrap().text().unwrap();
     let v: Value = serde_json::from_str(&text).unwrap();
-    println!("{}", v["content"].as_str().unwrap())
+    let content = str::replace(v["content"].as_str().unwrap(), "\n", "");
+    let decoded = base64::decode(&content).unwrap();
+    let fin = std::str::from_utf8(&decoded).unwrap();
+    return fin.to_string();
 }
 
 fn install(args: Vec<String>, recipes: &Vec<String>) {
@@ -70,7 +74,9 @@ fn install(args: Vec<String>, recipes: &Vec<String>) {
         "[+] Recipe {} found successfully, fetching instructions",
         args[2]
     );
-    fetch_instructions(args[2].as_str());
+    let inst = fetch_instructions(args[2].as_str());
+    println!("[+] Fetched instructions successfully");
+    println!("{}", inst);
 }
 
 fn load_recipe_cache(path: &PathBuf) -> Vec<String> {
