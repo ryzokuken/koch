@@ -4,6 +4,7 @@ extern crate serde_json;
 use std::env;
 use std::fs::File;
 use std::io::Read;
+use std::path::PathBuf;
 use std::io::ErrorKind;
 use serde_json::Value;
 
@@ -12,16 +13,30 @@ fn get_recipes() -> Vec<String> {
     let website = "https://api.github.com/repos/Homebrew/homebrew-core/git/trees/ae7c06e4b7c363a68df4ed010f8afbb02a8abf24";
     let text = reqwest::get(website).unwrap().text().unwrap();
     let v: Value = serde_json::from_str(&text).unwrap();
+
+    let patterns : &[_] = &['.', 'r', 'b'];
+
     for k in v["tree"].as_array().unwrap() {
-        recipes.push(k["path"].to_string());
+        recipes.push(k["path"].as_str().unwrap().trim_matches(patterns).to_string());
     }
     return recipes;
 }
 
-fn load_recipe_cache() -> Vec<String> {
-    let mut path = env::home_dir().unwrap();
-    path.push(".koch");
+fn update(args: Vec<String>, path: PathBuf) -> Vec<String> {
+    if args.len() != 2 {
+        panic!("Update expects no arguments.");
+    }
 
+    let recipes = get_recipes();
+    // let text = recipes.join("\n");
+
+    // let f = File::open(&path).unwrap();
+    // f.write_all(text.as_bytes());
+
+    return recipes;
+}
+
+fn load_recipe_cache(path: &PathBuf) -> Vec<String> {
     let f = File::open(&path);
 
     let mut f = match f {
@@ -42,14 +57,17 @@ fn load_recipe_cache() -> Vec<String> {
 }
 
 fn main() {
-    let mut recipes = load_recipe_cache();
+    let mut path = env::home_dir().unwrap();
+    path.push(".koch");
+
+    let mut recipes = load_recipe_cache(&path);
     for recipe in recipes {
         println!("{}", recipe);
     }
 
     let args: Vec<String> = env::args().collect();
     match args[1].as_str() {
-        "update" => recipes = get_recipes(),
+        "update" => recipes = update(args, path),
         // "install" => get_text(),
         _ => panic!("FAIL!"),
     }
