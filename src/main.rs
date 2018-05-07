@@ -46,6 +46,24 @@ fn update(args: Vec<String>, path: PathBuf) -> Vec<String> {
     return recipes;
 }
 
+fn install(args: Vec<String>, recipes: &Vec<String>) {
+    if args.len() != 3 {
+        panic!("Update expects a single argument.");
+    }
+
+    let mut iter = recipes.into_iter();
+    println!("[*] Attempting to install {}", args[2]);
+    if iter.find(|&x| x == &args[2]).is_none() {
+        println!("[-] Recipe {} not found", args[2]);
+        panic!("Recipe not found")
+    }
+
+    println!(
+        "[+] Recipe {} found successfully, fetching instructions",
+        args[2]
+    )
+}
+
 fn load_recipe_cache(path: &PathBuf) -> Vec<String> {
     let f = File::open(&path);
 
@@ -78,7 +96,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     match args[1].as_str() {
         "update" => recipes = update(args, path),
-        // "install" => get_text(),
+        "install" => install(args, &recipes),
         _ => panic!("FAIL!"),
     }
 
