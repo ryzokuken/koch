@@ -34,12 +34,14 @@ fn update(args: Vec<String>, path: PathBuf) -> Vec<String> {
         panic!("Update expects no arguments.");
     }
 
+    println!("[*] Updating Koch, fetching recipes");
     let recipes = get_recipes();
+    println!("[+] Recipes fetched successfully, writing to local disk");
     let text = recipes.join("\n");
 
-    println!("{:?}", path);
     let mut f = File::create(&path).unwrap();
     f.write_all(text.as_bytes()).unwrap();
+    println!("[+] Recipes written successfully to local disk");
 
     return recipes;
 }
@@ -69,9 +71,9 @@ fn main() {
     path.push(".koch");
 
     let mut recipes = load_recipe_cache(&path);
-    for recipe in recipes {
-        println!("{}", recipe);
-    }
+    // for recipe in recipes {
+    //     println!("{}", recipe);
+    // }
 
     let args: Vec<String> = env::args().collect();
     match args[1].as_str() {
@@ -80,7 +82,7 @@ fn main() {
         _ => panic!("FAIL!"),
     }
 
-    for recipe in recipes {
-        println!("{}", recipe);
-    }
+    // for recipe in recipes {
+    //     println!("{}", recipe);
+    // }
 }
