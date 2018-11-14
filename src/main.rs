@@ -1,121 +1,74 @@
-extern crate base64;
-extern crate reqwest;
-extern crate serde_json;
+extern crate openssl;
 
 use std::env;
-use std::fs::File;
-use std::io::Read;
-use std::path::PathBuf;
-use std::io::ErrorKind;
-use serde_json::Value;
-use std::io::prelude::*;
 
-fn get_recipes() -> Vec<String> {
-    let mut recipes = Vec::new();
-    let url = "https://api.github.com/repos/Homebrew/homebrew-core/git/trees/ae7c06e4b7c363a68df4ed010f8afbb02a8abf24";
-    let text = reqwest::get(url).unwrap().text().unwrap();
-    let v: Value = serde_json::from_str(&text).unwrap();
+mod file;
+mod encryption;
 
-    let patterns: &[_] = &['.', 'r', 'b'];
+fn encrypt_block(content: Vec<u8>, keyfile: &str) -> Vec<u8> {
+  let key = encryption::generate_key();
+  let iv = encryption::generate_nonce();
+  let key = key.as_ref();
+  let iv = iv.as_ref();
 
-    for k in v["tree"].as_array().unwrap() {
-        recipes.push(
-            k["path"]
-                .as_str()
-                .unwrap()
-                .trim_matches(patterns)
-                .to_string(),
-        );
-    }
-    return recipes;
+  let mut ciphertext = encryption::encrypt_block(content.as_ref(), key, iv);
+  file::write(keyfile, key);
+
+  let mut result = iv.to_vec();
+  result.append(&mut ciphertext);
+  return result;
 }
 
-fn update(args: Vec<String>, path: PathBuf) {
-    if args.len() != 2 {
-        panic!("Update expects no arguments.");
-    }
+fn encrypt_stream(content: Vec<u8>, keyfile: &str) -> Vec<u8> {
+  let key = encryption::generate_key();
+  let iv = encryption::generate_nonce();
 
-    println!("[*] Updating Koch, fetching recipes");
-    let recipes = get_recipes();
-    println!("[+] Recipes fetched successfully, writing to local disk");
-    let text = recipes.join("\n");
+  let mut ciphertext = encryption::encrypt_stream(content.as_ref(), key.as_ref(), iv.as_ref());
+  file::write(keyfile, key.as_ref());
 
-    let mut f = File::create(&path).unwrap();
-    f.write_all(text.as_bytes()).unwrap();
-    println!("[+] Recipes written successfully to local disk");
+  let mut result = iv.to_vec();
+  result.append(&mut ciphertext);
+  return result;
 }
 
-fn fetch_instructions(program: &str) -> String {
-    let url = format!(
-        "https://api.github.com/repos/Homebrew/homebrew-core/contents/Formula/{}.rb",
-        program
-    );
-    let text = reqwest::get(url.as_str()).unwrap().text().unwrap();
-    let v: Value = serde_json::from_str(&text).unwrap();
-    let content = str::replace(v["content"].as_str().unwrap(), "\n", "");
-    let decoded = base64::decode(&content).unwrap();
-    let fin = std::str::from_utf8(&decoded).unwrap();
-    return fin.to_string();
+fn decrypt_block(content: Vec<u8>, keyfile: &str) -> Vec<u8> {
+  let key = file::read(keyfile);
+
+  let length = content.len();
+  let iv = content[0..16].as_ref();
+  let data = content[16..length].as_ref();
+
+  return encryption::decrypt_block(data, key.as_ref(), iv);
 }
 
-fn install(args: Vec<String>, recipes: &Vec<String>) {
-    if args.len() != 3 {
-        panic!("Update expects a single argument.");
-    }
+fn decrypt_stream(content: Vec<u8>, keyfile: &str) -> Vec<u8> {
+  let key = file::read(keyfile);
 
-    let mut iter = recipes.into_iter();
-    println!("[*] Attempting to install {}", args[2]);
-    if iter.find(|&x| x == &args[2]).is_none() {
-        println!("[-] Recipe {} not found", args[2]);
-        panic!("Recipe not found")
-    }
+  let length = content.len();
+  let iv = content[0..16].as_ref();
+  let data = content[16..length].as_ref();
 
-    println!(
-        "[+] Recipe {} found successfully, fetching instructions",
-        args[2]
-    );
-    let inst = fetch_instructions(args[2].as_str());
-    println!("[+] Fetched instructions successfully");
-    println!("{}", inst);
-}
-
-fn load_recipe_cache(path: &PathBuf) -> Vec<String> {
-    let f = File::open(&path);
-
-    let mut f = match f {
-        Ok(file) => file,
-        Err(ref error) if error.kind() == ErrorKind::NotFound => match File::create(path) {
-            Ok(fc) => fc,
-            Err(e) => panic!(
-                "Tried to create cache file but there was a problem: {:?}",
-                e
-            ),
-        },
-        Err(error) => panic!("There was a problem opening the cache file: {:?}", error),
-    };
-
-    let mut s = String::new();
-    f.read_to_string(&mut s).unwrap();
-    return s.split("\n").map(|s| s.to_string()).collect();
+  return encryption::decrypt_stream(data, key.as_ref(), iv);
 }
 
 fn main() {
-    let mut path = env::home_dir().unwrap();
-    path.push(".koch");
+  let args: Vec<String> = env::args().collect();
 
-    let recipes = load_recipe_cache(&path);
-    // for recipe in recipes {
-    //     println!("{}", recipe);
-    // }
+  let query = &args[1];
+  let source = &args[2];
+  let destination = &args[3];
+  let keyfile = &args[4];
 
-    let args: Vec<String> = env::args().collect();
-    match args[1].as_str() {
-        "update" => update(args, path),
-        "install" => install(args, &recipes),
-        _ => panic!("FAIL!"),
-    }
+  let content = file::read(source);
 
-    // for recipe in recipes {
-    //     println!("{}", recipe);
-    // }
+  let result = match query.as_str() {
+    "encrypt-block" => Ok(encrypt_block(content, keyfile)),
+    "encrypt-stream" => Ok(encrypt_stream(content, keyfile)),
+    "decrypt-block" => Ok(decrypt_block(content, keyfile)),
+    "decrypt-stream" => Ok(decrypt_stream(content, keyfile)),
+    _ => Err("Invalid argument"),
+  };
+
+  let result = result.unwrap();
+  file::write(destination, result.as_ref());
 }
